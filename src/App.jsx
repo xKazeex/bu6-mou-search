@@ -414,6 +414,82 @@ function buildGrievanceTimeline({ kind, incidentDate, step1Happened, step1Decisi
   return steps;
 }
 
+// ---------- Lightweight markdown rendering (bold, headers, lists, rules) ----------
+// No dependency pulled in for this — Claude's answers use a small, predictable
+// subset of markdown, so a small hand-rolled renderer keeps the bundle light.
+
+function renderInlineBold(text, keyPrefix) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={`${keyPrefix}-b${i}`}>{part.slice(2, -2)}</strong>;
+    }
+    return <React.Fragment key={`${keyPrefix}-t${i}`}>{part}</React.Fragment>;
+  });
+}
+
+function MarkdownText({ text }) {
+  const lines = text.split("\n");
+  const blocks = [];
+  let listBuffer = [];
+
+  const flushList = (key) => {
+    if (listBuffer.length > 0) {
+      blocks.push(
+        <ul key={`ul-${key}`} style={{ margin: "4px 0 10px", paddingLeft: 20 }}>
+          {listBuffer.map((item, i) => (
+            <li key={i} style={{ marginBottom: 3 }}>{renderInlineBold(item, `li-${key}-${i}`)}</li>
+          ))}
+        </ul>
+      );
+      listBuffer = [];
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+    if (trimmed === "---" || trimmed === "***") {
+      flushList(idx);
+      blocks.push(<hr key={idx} style={{ border: "none", borderTop: "1px solid #E3DCC9", margin: "10px 0" }} />);
+      return;
+    }
+    const h3 = trimmed.match(/^###\s+(.*)/);
+    const h2 = trimmed.match(/^##\s+(.*)/);
+    const listItem = trimmed.match(/^[-*]\s+(.*)/);
+    if (h2) {
+      flushList(idx);
+      blocks.push(
+        <div key={idx} style={{ fontFamily: "'IBM Plex Serif', serif", fontWeight: 700, fontSize: 16.5, marginTop: idx === 0 ? 0 : 14, marginBottom: 4, color: "#1C2B33" }}>
+          {renderInlineBold(h2[1], `h2-${idx}`)}
+        </div>
+      );
+      return;
+    }
+    if (h3) {
+      flushList(idx);
+      blocks.push(
+        <div key={idx} style={{ fontFamily: "'IBM Plex Serif', serif", fontWeight: 600, fontSize: 15, marginTop: idx === 0 ? 0 : 10, marginBottom: 3, color: "#1C2B33" }}>
+          {renderInlineBold(h3[1], `h3-${idx}`)}
+        </div>
+      );
+      return;
+    }
+    if (listItem) {
+      listBuffer.push(listItem[1]);
+      return;
+    }
+    flushList(idx);
+    if (trimmed === "") {
+      blocks.push(<div key={idx} style={{ height: 6 }} />);
+    } else {
+      blocks.push(<div key={idx}>{renderInlineBold(line, `p-${idx}`)}</div>);
+    }
+  });
+  flushList("end");
+
+  return <>{blocks}</>;
+}
+
 function DeadlineCalculator() {
   const [kind, setKind] = useState("standard");
   const [incidentDate, setIncidentDate] = useState("");
@@ -765,7 +841,7 @@ export default function MOUSearchApp() {
                 color: "#F7F5F0",
               }}
             >
-              BU 6 &middot; PROTOTYPE
+              BU 6 &middot; ESGUERRA
             </span>
             <h1
               style={{
@@ -905,10 +981,9 @@ export default function MOUSearchApp() {
                       fontSize: 14.5,
                       lineHeight: 1.6,
                       color: m.error ? "#8A3B2E" : "#1C2B33",
-                      whiteSpace: "pre-wrap",
                     }}
                   >
-                    {m.text}
+                    <MarkdownText text={m.text} />
                   </div>
                   {m.sources && m.sources.length > 0 && (
                     <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
