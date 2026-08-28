@@ -41,6 +41,11 @@ const ALIASES = [
   [/\bpobr\b/gi, "peace officer bill of rights"],
   [/\bgsi\b/gi, "general salary increase"],
   [/\bcdl\b/gi, "commercial driver license"],
+  // Everyday phrasing reps actually type ("pay me", "paid late") doesn't share
+  // any words with how the MOU writes it ("wages", "salary advance", "payroll").
+  // Append the MOU's own vocabulary alongside the original words instead of
+  // replacing them, so both phrasings can match.
+  [/\b(pay|paid|pays|paycheck)\b/gi, (m) => m + " wages salary payroll timely"],
 ];
 
 function expandAliases(str) {
